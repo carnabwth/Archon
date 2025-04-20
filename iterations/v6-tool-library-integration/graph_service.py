@@ -67,4 +67,17 @@ async def invoke_agent(request: InvokeRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8100)
+    import os
+    import argparse
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Run the Archon graph service')
+    parser.add_argument('--port', type=int, help='Port to run the server on')
+    args = parser.parse_args()
+    
+    # Get port from command line args, then environment variable, then default
+    port = args.port or int(os.environ.get("PORT", 8100))
+    print(f"Starting server on port {port}")
+    
+    # For Streamlit Cloud, we need to bind to 0.0.0.0
+    uvicorn.run(app, host="0.0.0.0", port=port)

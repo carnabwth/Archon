@@ -6,6 +6,7 @@ import queue
 import time
 import sys
 import os
+import socket
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils import reload_archon_graph
@@ -113,8 +114,16 @@ def agent_service_tab():
             st.session_state.service_output = []
             st.session_state.output_queue = queue.Queue()
             
-            # Kill any process using port 8100
-            kill_process_on_port(8100)
+            # Get an available port
+            port = get_available_port()
+            print(f"Starting agent service with port {port}")
+            
+            # Kill any process using this port
+            kill_process_on_port(port)
+            
+            # Display the service URL
+            service_url = f"http://localhost:{port}"
+            st.info(f"Agent service is running at: {service_url}")
             
             # Start new process
             try:
@@ -122,9 +131,9 @@ def agent_service_tab():
                 base_path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
                 graph_service_path = os.path.join(base_path, 'graph_service.py')
                 
-                # Start the process with output redirection
+                # Start the process with output redirection and port argument
                 process = subprocess.Popen(
-                    [sys.executable, graph_service_path],
+                    [sys.executable, graph_service_path, "--port", str(port)],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -228,3 +237,12 @@ def agent_service_tab():
     if auto_refresh and st.session_state.service_running:
         time.sleep(0.1)  # Small delay to prevent excessive CPU usage
         st.rerun()
+
+# Function to get an available port for the agent service
+def get_available_port():
+    """Get an available port for the agent service."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('', 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port

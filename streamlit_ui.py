@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import streamlit as st
 import logfire
 import asyncio
+import os
 
 # Set page config - must be the first Streamlit command
 st.set_page_config(
@@ -36,6 +37,22 @@ load_css()
 
 # Configure logfire to suppress warnings (optional)
 logfire.configure(send_to_logfire='never')
+
+# Debug function to check environment variables
+def debug_env_vars():
+    st.write("### Environment Variables Debug")
+    env_vars = {
+        "EMBEDDING_BASE_URL": os.getenv("EMBEDDING_BASE_URL"),
+        "EMBEDDING_API_KEY": "***" if os.getenv("EMBEDDING_API_KEY") else None,
+        "EMBEDDING_PROVIDER": os.getenv("EMBEDDING_PROVIDER"),
+        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
+        "SUPABASE_SERVICE_KEY": "***" if os.getenv("SUPABASE_SERVICE_KEY") else None,
+        "REASONER_MODEL": os.getenv("REASONER_MODEL"),
+        "PRIMARY_MODEL": os.getenv("PRIMARY_MODEL"),
+        "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL")
+    }
+    for key, value in env_vars.items():
+        st.write(f"{key}: {'Set' if value else 'Not Set'}")
 
 async def main():
     # Check for tab query parameter
@@ -97,6 +114,7 @@ async def main():
     elif st.session_state.selected_tab == "Environment":
         st.title("Archon - Environment Configuration")
         environment_tab()
+        debug_env_vars()  # Add debug section
     elif st.session_state.selected_tab == "Agent Service":
         st.title("Archon - Agent Service")
         agent_service_tab()

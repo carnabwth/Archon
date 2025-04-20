@@ -6,6 +6,7 @@ import queue
 import time
 import sys
 import os
+import socket
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils import reload_archon_graph
@@ -35,47 +36,44 @@ def agent_service_tab():
     
     # Function to kill any process using port 8100
     def kill_process_on_port(port):
+        """Kill any process using the specified port."""
         try:
             if platform.system() == "Windows":
-                # Windows: use netstat to find the process using the port
+                # Windows-specific command
                 result = subprocess.run(
                     f'netstat -ano | findstr :{port}',
-                    shell=True, 
-                    capture_output=True, 
+                    shell=True,
+                    capture_output=True,
                     text=True
                 )
-                
                 if result.stdout:
-                    # Extract the PID from the output
-                    for line in result.stdout.splitlines():
-                        if f":{port}" in line and "LISTENING" in line:
-                            parts = line.strip().split()
-                            pid = parts[-1]
-                            # Kill the process
-                            subprocess.run(f'taskkill /F /PID {pid}', shell=True)
-                            st.session_state.output_queue.put(f"[{time.strftime('%H:%M:%S')}] Killed any existing process using port {port} (PID: {pid})\n")
-                            return True
+                    # Get the PID from the last column
+                    pid = result.stdout.strip().split()[-1]
+                    subprocess.run(['taskkill', '/F', '/PID', pid], check=True)
+                    print(f"Killed process {pid} using port {port}")
             else:
-                # Unix-like systems: use lsof to find the process using the port
-                result = subprocess.run(
-                    f'lsof -i :{port} -t',
-                    shell=True, 
-                    capture_output=True, 
-                    text=True
+                # Unix-like systems
+                subprocess.run(
+                    f"lsof -ti :{port} | xargs kill -9",
+                    shell=True,
+                    check=True
                 )
-                
-                if result.stdout:
-                    # Extract the PID from the output
-                    pid = result.stdout.strip()
-                    # Kill the process
-                    subprocess.run(f'kill -9 {pid}', shell=True)
-                    st.session_state.output_queue.put(f"[{time.strftime('%H:%M:%S')}] Killed process using port {port} (PID: {pid})\n")
-                    return True
-                    
-            return False
+                print(f"Killed process using port {port}")
+        except subprocess.CalledProcessError:
+            # No process found using the port
+            print(f"No process found using port {port}")
         except Exception as e:
-            st.session_state.output_queue.put(f"[{time.strftime('%H:%M:%S')}] Error killing process on port {port}: {str(e)}\n")
-            return False
+            st.error(f"Error killing process on port {port}: {str(e)}")
+            print(f"Error killing process on port {port}: {str(e)}")
+    
+    # Function to get an available port for the agent service
+    def get_available_port():
+        """Get an available port for the agent service."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('', 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        return port
     
     # Update service status
     st.session_state.service_running = is_service_running()
@@ -113,8 +111,16 @@ def agent_service_tab():
             st.session_state.service_output = []
             st.session_state.output_queue = queue.Queue()
             
-            # Kill any process using port 8100
-            kill_process_on_port(8100)
+            # Get an available port
+            port = get_available_port()
+            print(f"Starting agent service with port {port}")
+            
+            # Kill any process that might be using this port
+            kill_process_on_port(port)
+            
+            # Display the service URL
+            service_url = f"http://localhost:{port}"
+            st.info(f"Agent service is running at: {service_url}")
             
             # Start new process
             try:
@@ -122,9 +128,9 @@ def agent_service_tab():
                 base_path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
                 graph_service_path = os.path.join(base_path, 'graph_service.py')
                 
-                # Start the process with output redirection
+                # Start the process with output redirection and port argument
                 process = subprocess.Popen(
-                    [sys.executable, graph_service_path],
+                    [sys.executable, graph_service_path, "--port", str(port)],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
