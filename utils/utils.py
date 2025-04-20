@@ -416,6 +416,39 @@ def reload_archon_graph(show_reload_success=True):
 def get_clients():
     # LLM client setup
     embedding_client = None
+    
+    # Try to get from Streamlit secrets first
+    try:
+        if hasattr(st, 'secrets'):
+            base_url = getattr(st.secrets, 'EMBEDDING_BASE_URL', None) or getattr(st.secrets, 'embedding_base_url', None)
+            api_key = getattr(st.secrets, 'EMBEDDING_API_KEY', None) or getattr(st.secrets, 'embedding_api_key', None)
+            provider = getattr(st.secrets, 'EMBEDDING_PROVIDER', None) or getattr(st.secrets, 'embedding_provider', None)
+            
+            # If we got all the values from secrets, use them
+            if base_url and api_key and provider:
+                write_to_log(f"Using Streamlit secrets for client initialization: {provider}")
+                if provider == "Ollama":
+                    if api_key == "NOT_REQUIRED":
+                        api_key = "ollama"  # Use a dummy key for Ollama
+                    embedding_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+                else:
+                    embedding_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+                
+                # Try to get Supabase credentials from secrets
+                supabase_url = getattr(st.secrets, 'SUPABASE_URL', None) or getattr(st.secrets, 'supabase_url', None)
+                supabase_key = getattr(st.secrets, 'SUPABASE_SERVICE_KEY', None) or getattr(st.secrets, 'supabase_service_key', None)
+                
+                if supabase_url and supabase_key:
+                    try:
+                        supabase = Client(supabase_url, supabase_key)
+                        write_to_log("Successfully initialized Supabase client from Streamlit secrets")
+                        return embedding_client, supabase
+                    except Exception as e:
+                        write_to_log(f"Failed to initialize Supabase from secrets: {e}")
+    except Exception as e:
+        write_to_log(f"Error accessing Streamlit secrets in get_clients: {str(e)}")
+    
+    # Fall back to regular environment variables if secrets didn't work
     base_url = get_env_var('EMBEDDING_BASE_URL') or 'https://api.openai.com/v1'
     api_key = get_env_var('EMBEDDING_API_KEY') or 'no-api-key-provided'
     provider = get_env_var('EMBEDDING_PROVIDER') or 'OpenAI'

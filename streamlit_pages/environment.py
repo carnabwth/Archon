@@ -10,6 +10,33 @@ from utils.utils import (
 )
 
 def environment_tab():    
+    # Add a section to display Streamlit secrets
+    st.subheader("Streamlit Cloud Secrets")
+    st.write("These are the environment variables set in Streamlit Cloud:")
+    
+    try:
+        if hasattr(st, 'secrets'):
+            # Create a table to display the secrets
+            secrets_data = []
+            for key in dir(st.secrets):
+                if not key.startswith('_') and not callable(getattr(st.secrets, key)):
+                    value = getattr(st.secrets, key)
+                    # Mask sensitive values
+                    if "key" in key.lower() or "secret" in key.lower() or "token" in key.lower():
+                        display_value = "***" + "*" * (len(str(value)) - 3) if len(str(value)) > 3 else "***"
+                    else:
+                        display_value = str(value)
+                    secrets_data.append({"Variable": key.upper(), "Value": display_value})
+            
+            if secrets_data:
+                st.table(secrets_data)
+            else:
+                st.warning("No secrets found in Streamlit Cloud.")
+    except Exception as e:
+        st.error(f"Error accessing Streamlit secrets: {str(e)}")
+    
+    st.markdown("---")
+    
     # Get all available profiles and current profile
     profiles = get_all_profiles()
     current_profile = get_current_profile()
