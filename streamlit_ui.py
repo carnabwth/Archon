@@ -41,6 +41,17 @@ logfire.configure(send_to_logfire='never')
 # Debug function to check environment variables
 def debug_env_vars():
     st.write("### Environment Variables Debug")
+    st.write("Checking environment variables from both .env and Streamlit secrets...")
+    
+    # Check if we can access st.secrets
+    try:
+        st.write("Streamlit secrets available:", bool(st.secrets))
+        if st.secrets:
+            st.write("Keys in st.secrets:", list(st.secrets.keys()))
+    except Exception as e:
+        st.write("Error accessing st.secrets:", str(e))
+    
+    # Check environment variables
     env_vars = {
         "EMBEDDING_BASE_URL": os.getenv("EMBEDDING_BASE_URL"),
         "EMBEDDING_API_KEY": "***" if os.getenv("EMBEDDING_API_KEY") else None,
@@ -51,8 +62,23 @@ def debug_env_vars():
         "PRIMARY_MODEL": os.getenv("PRIMARY_MODEL"),
         "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL")
     }
+    
+    st.write("### Environment Variables Status")
     for key, value in env_vars.items():
         st.write(f"{key}: {'Set' if value else 'Not Set'}")
+        if value:
+            st.write(f"  Value length: {len(str(value))}")
+    
+    # Try to access variables through st.secrets
+    st.write("### Trying to access through st.secrets")
+    try:
+        for key in env_vars.keys():
+            if hasattr(st.secrets, key.lower()):
+                st.write(f"{key}: Set (from st.secrets)")
+            else:
+                st.write(f"{key}: Not Set (in st.secrets)")
+    except Exception as e:
+        st.write("Error accessing st.secrets:", str(e))
 
 async def main():
     # Check for tab query parameter
