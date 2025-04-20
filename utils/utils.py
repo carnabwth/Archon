@@ -47,10 +47,20 @@ def get_env_var(var_name: str, profile: Optional[str] = None) -> Optional[str]:
     Returns:
         The value of the environment variable or None if not found
     """
+    # First try to get from Streamlit secrets
+    try:
+        if hasattr(st, 'secrets'):
+            # Try both uppercase and lowercase
+            value = getattr(st.secrets, var_name, None) or getattr(st.secrets, var_name.lower(), None)
+            if value:
+                return value
+    except Exception as e:
+        write_to_log(f"Error accessing Streamlit secrets: {str(e)}")
+    
     # Path to the JSON file storing environment variables
     env_file_path = os.path.join(workbench_dir, "env_vars.json")
     
-    # First try to get from JSON file
+    # Then try to get from JSON file
     if os.path.exists(env_file_path):
         try:
             with open(env_file_path, "r") as f:
@@ -289,34 +299,57 @@ def get_profile_env_vars(profile_name: Optional[str] = None) -> dict:
     """Get all environment variables for a specific profile.
     
     Args:
-        profile_name: The name of the profile (if None, uses the current profile)
+        profile_name: The profile to get variables for (if None, uses the current profile)
         
     Returns:
-        Dictionary of environment variables for the profile
+        Dictionary of environment variables
     """
+    # Initialize with empty dict
+    env_vars = {}
+    
+    # First try to get from Streamlit secrets
+    try:
+        if hasattr(st, 'secrets'):
+            # Add all secrets to the env_vars dict
+            for key in dir(st.secrets):
+                if not key.startswith('_') and not callable(getattr(st.secrets, key)):
+                    env_vars[key.upper()] = getattr(st.secrets, key)
+    except Exception as e:
+        write_to_log(f"Error accessing Streamlit secrets: {str(e)}")
+    
+    # Path to the JSON file storing environment variables
     env_file_path = os.path.join(workbench_dir, "env_vars.json")
     
+    # Then try to get from JSON file
     if os.path.exists(env_file_path):
         try:
             with open(env_file_path, "r") as f:
-                env_vars = json.load(f)
+                json_env_vars = json.load(f)
                 
                 # If profile is specified, use it; otherwise use current profile
-                current_profile = profile_name or env_vars.get("current_profile", "default")
+                current_profile = profile_name or json_env_vars.get("current_profile", "default")
                 
                 # Get variables for the profile
-                if "profiles" in env_vars and current_profile in env_vars["profiles"]:
-                    return env_vars["profiles"][current_profile]
+                if "profiles" in json_env_vars and current_profile in json_env_vars["profiles"]:
+                    profile_vars = json_env_vars["profiles"][current_profile]
+                    # Update env_vars with profile variables (don't overwrite secrets)
+                    for key, value in profile_vars.items():
+                        if key not in env_vars:
+                            env_vars[key] = value
                 
-                # For backward compatibility, if no profiles structure but we're looking for default
-                if current_profile == "default" and "profiles" not in env_vars:
-                    # Return all variables except profiles and current_profile
-                    return {k: v for k, v in env_vars.items() 
-                            if k not in ["profiles", "current_profile"]}
+                # For backward compatibility, check the root level
+                for key, value in json_env_vars.items():
+                    if key != "profiles" and key != "current_profile" and key not in env_vars:
+                        env_vars[key] = value
         except (json.JSONDecodeError, IOError) as e:
             write_to_log(f"Error reading env_vars.json: {str(e)}")
     
-    return {}
+    # Finally, add any environment variables not already in env_vars
+    for key, value in os.environ.items():
+        if key not in env_vars:
+            env_vars[key] = value
+    
+    return env_vars
 
 def log_node_execution(func):
     """Decorator to log the start and end of graph node execution.
