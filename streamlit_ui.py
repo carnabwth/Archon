@@ -48,6 +48,21 @@ def debug_env_vars():
         st.write("Streamlit secrets available:", bool(st.secrets))
         if st.secrets:
             st.write("Keys in st.secrets:", list(st.secrets.keys()))
+            
+            # Try to access each secret directly
+            st.write("### Direct Secret Access")
+            for key in ["EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_PROVIDER", 
+                       "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "REASONER_MODEL", 
+                       "PRIMARY_MODEL", "EMBEDDING_MODEL"]:
+                try:
+                    # Try both uppercase and lowercase
+                    value = getattr(st.secrets, key, None) or getattr(st.secrets, key.lower(), None)
+                    if value:
+                        st.write(f"{key}: Set (value length: {len(str(value))})")
+                    else:
+                        st.write(f"{key}: Not Set")
+                except Exception as e:
+                    st.write(f"{key}: Error accessing - {str(e)}")
     except Exception as e:
         st.write("Error accessing st.secrets:", str(e))
     
@@ -63,17 +78,19 @@ def debug_env_vars():
         "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL")
     }
     
-    st.write("### Environment Variables Status")
+    st.write("### Environment Variables Status (from os.getenv)")
     for key, value in env_vars.items():
         st.write(f"{key}: {'Set' if value else 'Not Set'}")
         if value:
             st.write(f"  Value length: {len(str(value))}")
     
-    # Try to access variables through st.secrets
-    st.write("### Trying to access through st.secrets")
+    # Try to access variables through st.secrets dictionary style
+    st.write("### Trying to access through st.secrets dictionary style")
     try:
         for key in env_vars.keys():
-            if hasattr(st.secrets, key.lower()):
+            # Try both uppercase and lowercase
+            value = st.secrets.get(key, None) or st.secrets.get(key.lower(), None)
+            if value:
                 st.write(f"{key}: Set (from st.secrets)")
             else:
                 st.write(f"{key}: Not Set (in st.secrets)")
