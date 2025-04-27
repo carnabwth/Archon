@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 import socket
+import shutil  # 🆕 Added because we now check if lsof exists
 
 def get_available_port():
     """Get an available port for the agent service."""
@@ -23,7 +24,6 @@ def kill_process_on_port(port):
                 text=True
             )
             if result.stdout:
-                # Get the PID from the last column
                 pid = result.stdout.strip().split()[-1]
                 subprocess.run(['taskkill', '/F', '/PID', pid], check=True)
                 print(f"Killed process {pid} using port {port}")
@@ -31,17 +31,32 @@ def kill_process_on_port(port):
                 print(f"No process found using port {port}")
         else:
             # Unix-like systems
-            subprocess.run(
-                f"lsof -ti :{port} | xargs kill -9",
-                shell=True,
-                check=True
-            )
-            print(f"Killed process using port {port}")
+            if shutil.which("lsof") is not None:
+                subprocess.run(
+                    f"lsof -ti :{port} | xargs kill -9",
+                    shell=True,
+                    check=True
+                )
+                print(f"Killed process using port {port}")
+            else:
+                print("lsof not found. Skipping port cleanup.")
     except subprocess.CalledProcessError:
-        # No process found using the port
         print(f"No process found using port {port}")
     except Exception as e:
         print(f"Error killing process on port {port}: {str(e)}")
+
+if __name__ == "__main__":
+    # Get an available port
+    port = get_available_port()
+    print(f"Starting agent service with port {port}")
+    
+    # Kill any process that might be using this port
+    kill_process_on_port(port)
+    
+    # Get the absolute path to the graph service script
+    base
+
+
 
 if __name__ == "__main__":
     # Get an available port
